@@ -1,115 +1,106 @@
-import math
 import pickle
+from src.package import Package
+from src.rectangle import Rectangle
+from src.stack import Stack
+from src.sheet import Sheet
+from src.part import Part
+
+file_name = "save.bin"
+
+# def place_rectangle(package, sheet_l, sheet_w):
+#     result = [Sheet(sheet_l, sheet_w)]
+#     count_p = 0
+#     count_sh = 0
+#     coordinates = [(0, 0)]
+#
+#     # sorting by width
+#     package.sort_square()
+#
+#     for item in package.pack:
+#         for _ in range(item.number):
+#             for x, y in coordinates:
+#                 if x + item.length <= sheet_l and y + item.width <= sheet_w:
+#                     count_p += 1
+#                     result[count_sh].add_part(Part(item.rectangle, (x, y), idx=count_p))
+#                     item.use()
+#                     coordinates.remove((x, y))
+#
+#                     coordinates.append((x, y + item.width))
+#                     coordinates.append((x + item.length, y))
+#
+#                     print(coordinates)
+#                     break
+#             else:
+#                 result.append(Sheet(sheet_l, sheet_w))
+#                 count_sh += 1
+#                 result[count_sh].idx = count_sh
+#                 count_p = 1
+#                 result[count_sh].add_part(Part(item.rectangle, (0, 0), idx=count_p))
+#                 item.use()
+#                 coordinates = [(0, item.width), (item.length, 0)]
+#
+#                 print(coordinates)
+#     return result
 
 
-class Rectangle:
-    def __init__(self, length, width, n, r=False):
-        self.idx = 1
-        self.length = length
-        self.width = width
-        self.number = n
-        self.rotate = r
+def place_rectangle(package, sheet_l, sheet_w):
+    result = [Sheet(sheet_l, sheet_w)]
+    count_p = 0
+    count_sh = 0
+    coordinates = [(0, 0, 0)]
 
-    def square_one(self):
-        return self.length * self.width
+    # sorting by width
+    package.sort_square()
+    package.sort_width()
 
-    def square_all(self):
-        return self.length * self.width * self.number
+    for item in package.pack:
+        for _ in range(item.number):
+            for x, y, s in coordinates:
+                if x + item.length <= sheet_l and y + item.width <= sheet_w:
+                    count_p += 1
+                    result[count_sh].add_part(Part(item.rectangle, (x, y), idx=count_p))
+                    item.use()
+                    coordinates.remove((x, y, count_sh))
 
-    def use(self, n_use=1, verbose=False):
-        if (self.number - n_use) >= 0:
-            self.number -= n_use
-            if self.number <= 0:
-                return 0
+                    coordinates.append((x, y + item.width, count_sh))
+                    coordinates.append((x + item.length, y, count_sh))
 
-        if verbose:
-            return self.number
+                    print(coordinates)
+                    break
+            else:
+                result.append(Sheet(sheet_l, sheet_w))
+                count_sh += 1
+                result[count_sh].idx = count_sh
+                count_p = 1
+                result[count_sh].add_part(Part(item.rectangle, (0, 0, count_sh), idx=count_p))
+                item.use()
+                coordinates.append((0, item.width, count_sh))
+                coordinates.append((item.length, 0, count_sh))
 
-    def left(self):
-        return self.number
-
-    def set_idx(self, idx):
-        self.idx = idx
-
-    def to_dict(self):
-        return {
-            "idx": self.idx,
-            "length": self.length,
-            "width": self.width,
-            "n": self.number,
-            "rotate": self.rotate
-        }
-
-
-class Package:
-    def __init__(self):
-        self.idx_count = 0
-        self.pack = []
-
-    def add_rect(self, item):
-        self.idx_count += 1
-        item.set_idx(self.idx_count)
-        self.pack.append(item)
-
-    def remove_rect(self, idx):
-        for item in self.pack:
-            if item.idx == idx:
-                self.pack.remove(item)
-
-    def show_pack(self):
-        return [i.to_dict() for i in self.pack]
-
-    def find_rect(self, first_d, second_d=None):
-        res = []
-        for item in self.pack:
-            if item.length == first_d:
-                if not second_d:
-                    res.append(item)
-                elif item.width == second_d:
-                    res.append(item)
-            elif item.width == first_d:
-                if not second_d:
-                    res.append(item)
-                elif item.length == second_d:
-                    res.append(item)
-        return res
-
-    def get_by_idx(self, idx: int) -> Rectangle:
-        for item in self.pack:
-            if item.idx == idx:
-                return item
-
-    def use_by_idx(self, idx, n_use=1):
-        for item in self.pack:
-            if item.idx == idx:
-                item.use(n_use)
-                if item.number == 0:
-                    print(f"idx={item.idx} removed: n=0")
-                    self.pack.remove(item)
-
-    def square(self):
-        res = 0
-        for item in self.pack:
-            res += item.square_all()
-        return res
-
-
-class Sheet:
-    def __init__(self, length, width):
-        self.length = length
-        self.width = width
+                print(coordinates)
+    return result
 
 
 if __name__ == '__main__':
     pack = Package()
-    rec1 = Rectangle(1000, 250, 2)
-    rec2 = Rectangle(1000, 500, 2)
-    pack.add_rect(rec1)
-    pack.add_rect(rec2)
-    print(pack.show_pack())
-    print([i.to_dict() for i in pack.find_rect(250)])
-    print(pack.square())
-    pack.use_by_idx(2, 2)
-    pack.use_by_idx(1, 2)
-    print(pack.show_pack())
-    print(pack.square())
+    stack1 = Stack(Rectangle(1000, 500), 2)
+    stack2 = Stack(Rectangle(500, 1000), 4)
+    pack.add_stack(stack1)
+    pack.add_stack(stack2)
+    # print(pack.show_pack())
+    # print([(i.length, i.width) for i in pack.rect_list()])
+    # print([i.to_dict() for i in pack.find_stack(1000)])
+    # print(pack.square())
+    # pack.use_by_idx(2, 2)
+    # pack.use_by_idx(1, 2)
+    # print(pack.show_pack())
+    # print(pack.square())
+    # sheet_1 = Sheet(5600, 1240)
+
+    with open(file_name, "wb") as fh:
+        pickle.dump(place_rectangle(pack, 2000, 1000), fh)
+
+    with open(file_name, "rb") as fh:
+        unpacked = pickle.load(fh)
+
+    print([i.to_list() for i in unpacked])
