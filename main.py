@@ -1,106 +1,158 @@
-import pickle
-from src.package import Package
-from src.rectangle import Rectangle
-from src.stack import Stack
-from src.sheet import Sheet
-from src.part import Part
+from PIL import Image, ImageDraw, ImageFont
 
-file_name = "save.bin"
+file_name = "res.pdf"
+# TITLE = "Title"
+A4_pix = (1169, 827)
+A4_real = (297, 210)
+MAIN_LINE = 2
+THIN_LINE = 1
 
-# def place_rectangle(package, sheet_l, sheet_w):
-#     result = [Sheet(sheet_l, sheet_w)]
-#     count_p = 0
-#     count_sh = 0
-#     coordinates = [(0, 0)]
-#
-#     # sorting by width
-#     package.sort_square()
-#
-#     for item in package.pack:
-#         for _ in range(item.number):
-#             for x, y in coordinates:
-#                 if x + item.length <= sheet_l and y + item.width <= sheet_w:
-#                     count_p += 1
-#                     result[count_sh].add_part(Part(item.rectangle, (x, y), idx=count_p))
-#                     item.use()
-#                     coordinates.remove((x, y))
-#
-#                     coordinates.append((x, y + item.width))
-#                     coordinates.append((x + item.length, y))
-#
-#                     print(coordinates)
-#                     break
-#             else:
-#                 result.append(Sheet(sheet_l, sheet_w))
-#                 count_sh += 1
-#                 result[count_sh].idx = count_sh
-#                 count_p = 1
-#                 result[count_sh].add_part(Part(item.rectangle, (0, 0), idx=count_p))
-#                 item.use()
-#                 coordinates = [(0, item.width), (item.length, 0)]
-#
-#                 print(coordinates)
-#     return result
+MAIN_FRAME_MARGIN = (20, 5, 5, 5)  #mm; left, top, right, bottom; rect draws from left-top to right-bottom points
+DRAWING_MARGIN = 10  # mm
+
+m = round((A4_real[0] / A4_pix[0]), 5)  #scale
+
+main_frame_coord = (round(MAIN_FRAME_MARGIN[0] / m),
+                    round(MAIN_FRAME_MARGIN[1] / m),
+                    round((A4_real[0] - MAIN_FRAME_MARGIN[2]) / m),
+                    round((A4_real[1] - MAIN_FRAME_MARGIN[3]) / m))
 
 
-def place_rectangle(package, sheet_l, sheet_w):
-    result = [Sheet(sheet_l, sheet_w)]
-    count_p = 0
-    count_sh = 0
-    coordinates = [(0, 0, 0)]
+class Item:
+    def __init__(self, idx, height, width):
+        self.idx = idx
+        self.height = height
+        self.width = width
+        self.coordinates = None  # (sheet, x, y)
 
-    # sorting by width
-    package.sort_square()
-    package.sort_width()
 
-    for item in package.pack:
-        for _ in range(item.number):
-            for x, y, s in coordinates:
-                if x + item.length <= sheet_l and y + item.width <= sheet_w:
-                    count_p += 1
-                    result[count_sh].add_part(Part(item.rectangle, (x, y), idx=count_p))
-                    item.use()
-                    coordinates.remove((x, y, count_sh))
+class Sheet:
 
-                    coordinates.append((x, y + item.width, count_sh))
-                    coordinates.append((x + item.length, y, count_sh))
+    def __init__(self, idx, height, width):
+        self.idx = idx
+        self.height = height
+        self.width = width
+        self.items = []
+        self.items_count = 0
 
-                    print(coordinates)
-                    break
-            else:
-                result.append(Sheet(sheet_l, sheet_w))
-                count_sh += 1
-                result[count_sh].idx = count_sh
-                count_p = 1
-                result[count_sh].add_part(Part(item.rectangle, (0, 0, count_sh), idx=count_p))
-                item.use()
-                coordinates.append((0, item.width, count_sh))
-                coordinates.append((item.length, 0, count_sh))
+    def add_item(self, item_):
+        self.items_count += 1
+        self.items.append(item_)
 
-                print(coordinates)
-    return result
+
+class Package:
+    def __init__(self, name):
+        self.name = name
+        self.sheets_count = 0
+        self.items_count = 0
+        self.sheets = []
+
+    def add_sheet(self, sheet_):
+        self.sheets_count += 1
+        self.items_count += sheet_.items_count
+        self.sheets.append(sheet_)
+
+
+def real_to_pix(real, m_):
+    return round(real / m_)
+
+
+def get_framed_image():
+    image_ = Image.new("RGB", A4_pix, "white")
+    drawing = ImageDraw.Draw(image_)
+    drawing.rectangle(main_frame_coord, fill=None, outline="black", width=MAIN_LINE)
+    return image_, drawing
+
+
+def draw_sheet(drawing, sheet_inner, start_coord):
+    x_end_sheet_pix = main_frame_coord[2] - real_to_pix(DRAWING_MARGIN, m)
+    scale = (sheet_inner.width / (x_end_sheet_pix - start_coord[0]))  #TODO make scale vertical and horizon
+
+    height_sheet_pix = real_to_pix(sheet_inner.height, scale)
+    y_end_sheet_pix = start_coord[1] + height_sheet_pix
+
+    sheet_coord = start_coord[0], start_coord[1], x_end_sheet_pix, y_end_sheet_pix
+    drawing.rectangle(sheet_coord, fill=None, outline="red", width=MAIN_LINE)
+
+    for item_inner in sheet_inner.items:
+        drawing = draw_item(drawing, item_inner, scale, start_coord)
+
+    return drawing, sheet_inner, scale, y_end_sheet_pix
+
+
+def draw_item(drawing, item_, scale, starts_coord):
+    start_item_pix = (starts_coord[0] + real_to_pix(item_.coordinates[1], scale),
+                      starts_coord[1] + real_to_pix(item_.coordinates[2], scale))
+    x_end_item_pix = start_item_pix[0] + real_to_pix(item_.width, scale)
+    y_end_item_pix = start_item_pix[1] + real_to_pix(item_.height, scale)
+    item_coord = start_item_pix[0], start_item_pix[1], x_end_item_pix, y_end_item_pix
+    drawing.rectangle(item_coord, fill=None, outline="blue", width=MAIN_LINE)
+    return drawing
+
+
+def draw_title(drawing, title):
+    font = ImageFont.truetype("arial.ttf", 40)
+    text_bbox = drawing.textbbox((0, 0), title, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    text_x = (A4_pix[0] - text_width) // 2
+    text_y = (A4_pix[1] - text_height) // 2
+    drawing.text((text_x, text_y), title, fill="black", font=font)
+    return drawing
+
+
+def pack_saving(output_path, pack):
+    images = []
+
+    # Title
+    image, draw = get_framed_image()
+
+    draw = draw_title(draw, pack.name)
+    images.append(image)
+
+    # New page
+    image, draw = get_framed_image()
+    start_sheet_pix = (main_frame_coord[0] + real_to_pix(DRAWING_MARGIN, m),
+                       main_frame_coord[1] + real_to_pix(DRAWING_MARGIN, m))
+    scale = None
+
+    for sheet_next in pack.sheets:
+        if scale is None:
+            scale = (sheet_next.width / (A4_pix[0] - MAIN_FRAME_MARGIN[0] - MAIN_FRAME_MARGIN[2] - 2 * DRAWING_MARGIN))
+
+        out_of_range = start_sheet_pix[1] + MAIN_FRAME_MARGIN[3]+real_to_pix(sheet_next.height, scale)
+
+        if out_of_range > main_frame_coord[3]:
+            images.append(image)
+            image, draw = get_framed_image()
+            start_sheet_pix = (main_frame_coord[0] + real_to_pix(DRAWING_MARGIN, m),
+                               main_frame_coord[1] + real_to_pix(DRAWING_MARGIN, m))
+            draw, sheet_next, scale, y_end_sheet_pix = draw_sheet(draw, sheet_next, start_sheet_pix)
+            start_sheet_pix = (start_sheet_pix[0],
+                               y_end_sheet_pix + real_to_pix(DRAWING_MARGIN, m))
+        else:
+            draw, sheet_next, scale, y_end_sheet_pix = draw_sheet(draw, sheet_next, start_sheet_pix)
+            start_sheet_pix = (start_sheet_pix[0],
+                               y_end_sheet_pix + real_to_pix(DRAWING_MARGIN, m))
+
+    images.append(image)
+    images[0].save(output_path, save_all=True, append_images=images[1:])
 
 
 if __name__ == '__main__':
-    pack = Package()
-    stack1 = Stack(Rectangle(1000, 500), 2)
-    stack2 = Stack(Rectangle(500, 1000), 4)
-    pack.add_stack(stack1)
-    pack.add_stack(stack2)
-    # print(pack.show_pack())
-    # print([(i.length, i.width) for i in pack.rect_list()])
-    # print([i.to_dict() for i in pack.find_stack(1000)])
-    # print(pack.square())
-    # pack.use_by_idx(2, 2)
-    # pack.use_by_idx(1, 2)
-    # print(pack.show_pack())
-    # print(pack.square())
-    # sheet_1 = Sheet(5600, 1240)
 
-    with open(file_name, "wb") as fh:
-        pickle.dump(place_rectangle(pack, 2000, 1000), fh)
+    item = Item(1, 100, 750)
+    item.coordinates = (1, 0, 0)
+    item2 = Item(1, 100, 500)
+    item2.coordinates = (1, 0, 100)
+    sheet = Sheet(1, 270, 1000)
+    sheet.add_item(item)
+    sheet.add_item(item2)
+    package = Package('New Title')
+    for _ in range(11):
+        package.add_sheet(sheet)
 
-    with open(file_name, "rb") as fh:
-        unpacked = pickle.load(fh)
-
-    print([i.to_list() for i in unpacked])
+    print(item.__dict__)
+    print(sheet.__dict__)
+    print(package.__dict__)
+    pack_saving(file_name, package)
