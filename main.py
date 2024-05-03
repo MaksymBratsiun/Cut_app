@@ -57,6 +57,12 @@ def real_to_pix(real, m_):
     return round(real / m_)
 
 
+def scale_calc(sheet_):
+    scale_w = (sheet_.width / (A4_pix[0] - real_to_pix(MAIN_FRAME_MARGIN[0]+MAIN_FRAME_MARGIN[2]+2*DRAWING_MARGIN, m)))
+    scale_h = (sheet_.height / (A4_pix[1] - real_to_pix(MAIN_FRAME_MARGIN[1]+MAIN_FRAME_MARGIN[3]+2*DRAWING_MARGIN, m)))
+    return max([scale_w, scale_h])
+
+
 def get_framed_image():
     image_ = Image.new("RGB", A4_pix, "white")
     drawing = ImageDraw.Draw(image_)
@@ -65,9 +71,8 @@ def get_framed_image():
 
 
 def draw_sheet(drawing, sheet_inner, start_coord):
-    x_end_sheet_pix = main_frame_coord[2] - real_to_pix(DRAWING_MARGIN, m)
-    scale = (sheet_inner.width / (x_end_sheet_pix - start_coord[0]))  #TODO make scale vertical and horizon
-
+    scale = scale_calc(sheet_inner)
+    x_end_sheet_pix = start_coord[0] + real_to_pix(sheet_inner.width, scale)
     height_sheet_pix = real_to_pix(sheet_inner.height, scale)
     y_end_sheet_pix = start_coord[1] + height_sheet_pix
 
@@ -118,8 +123,7 @@ def pack_saving(output_path, pack):
 
     for sheet_next in pack.sheets:
         if scale is None:
-            scale = (sheet_next.width / (A4_pix[0] - MAIN_FRAME_MARGIN[0] - MAIN_FRAME_MARGIN[2] - 2 * DRAWING_MARGIN))
-
+            scale = scale_calc(sheet_next)
         out_of_range = start_sheet_pix[1] + MAIN_FRAME_MARGIN[3]+real_to_pix(sheet_next.height, scale)
 
         if out_of_range > main_frame_coord[3]:
@@ -145,11 +149,11 @@ if __name__ == '__main__':
     item.coordinates = (1, 0, 0)
     item2 = Item(1, 100, 500)
     item2.coordinates = (1, 0, 100)
-    sheet = Sheet(1, 270, 1000)
+    sheet = Sheet(1, 220, 1000)
     sheet.add_item(item)
     sheet.add_item(item2)
     package = Package('New Title')
-    for _ in range(11):
+    for _ in range(2):
         package.add_sheet(sheet)
 
     print(item.__dict__)
