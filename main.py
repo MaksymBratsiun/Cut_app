@@ -120,7 +120,7 @@ def pack_saving(output_path, pack):
     start_sheet_pix = (main_frame_coord[0] + real_to_pix(DRAWING_MARGIN, m),
                        main_frame_coord[1] + real_to_pix(DRAWING_MARGIN, m))
     scale = None
-
+    # Next page
     for sheet_next in pack.sheets:
         if scale is None:
             scale = scale_calc(sheet_next)
